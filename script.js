@@ -213,13 +213,13 @@ if (deleteSaveLinkBottom) {
 // -------------------------------------------
 
 // Game elements
-const initialPaddleHeight = 100; // Store original height for reset and calculation
+const initialPaddleHeight = 120; // Increased from 100
 const paddleWidth = 10;
 // let paddleHeight = 100; // This will now be part of player/ai objects
-const ballSize = 10;
-const baseBallSpeed = 5; // Base speed for calculations and revert
+const ballSize = 12; // Reduced from 14, original was 10
+const baseBallSpeed = 6; // Reduced from 8, original was 5
 const aiErrorMargin = 110;
-const redBallChance = 0.25;
+const redBallChance = 0.15; // Chance ball turns red after a WHITE ball is hit by a paddle
 const initialHearts = 3;
 const maxHearts = 5; // Maximum hearts a player can have
 const winningScore = 30; // Score needed to win (changed back to 30)
@@ -230,17 +230,17 @@ const MAX_UPGRADE_LEVEL = 5;
 const UPGRADE_COSTS = {
     paddleLength:  { base: 5,  multiplier: 1.5 }, // Halved base cost
     paddleGrip:    { base: 8,  multiplier: 1.6 }, // Reduced base cost
-    coinBonus:     { base: 12, multiplier: 1.8 }, // Reduced base cost
-    startingScore: { base: 5,  multiplier: 1.5 }, // Halved base cost
-    extraHeart:    { base: 25, multiplier: 2.0 }  // Halved base cost
+    coinBonus:     { base: 25, multiplier: 1.6 }, // Reduced base cost
+    startingScore: { base: 40, multiplier: 1.8 }, // Cost scaling
+    extraHeart:    { base: 100, multiplier: 2.0 }  // Cost scaling
 };
 
 const UPGRADE_EFFECTS = {
-    paddleLength:  { scale: 0.08 }, // CHANGED: 4% per level (Max 20% or 120px total at level 5)
-    paddleGrip:    { scale: 0.10 }, // 10% less angle change per level (Max 50% at level 5)
-    coinBonus:     { scale: 0.05 }, // 5% more coins per level (Max 25% at level 5)
-    startingScore: { scale: 1 },    // +1 starting score per level
-    extraHeart:    { scale: 1 }     // +1 starting heart per level
+    paddleLength:  { scale: 0.15 },      // Was 0.08 (15% length increase per level)
+    paddleGrip:    { scale: 0.15 },          // Was 0.10 (15% grip increase per level)
+    coinBonus:     { scale: 0.15 },         // Was 0.05 (15% coin bonus per level)
+    startingScore: { scale: 2 },     // Was 1 (2 starting points per level)
+    extraHeart:    { scale: 1 }        // Kept at 1 (1 extra heart per level)
 };
 // -------------------------------
 
@@ -261,6 +261,11 @@ const minPaddleHeight = initialPaddleHeight * 0.5; // Prevent paddles shrinking 
 const multiBallDuration = 15000; // 15 seconds
 const speedBoostDuration = 15000; // 15 seconds
 const doubleScoreDuration = 30000; // 30 seconds
+
+// --- Powerup Constants --- ADDED Magnet constants
+const MAGNET_RANGE = 80; // Pixels within which powerups are attracted
+const MAGNET_STRENGTH = 2.5; // Increased from 0.8 (How strongly powerups move towards the ball)
+// -------------------------
 
 // Game state
 let gameRunning = false;
@@ -484,6 +489,28 @@ function update() {
     // Move AI
     moveAI();
     
+    // --- Magnetic Powerup Logic --- ADDED
+    if (balls.length > 0) { // Only apply if there's a ball
+        const mainBall = balls[0];
+        activePowerups.forEach(powerup => {
+            const dx = mainBall.x - (powerup.x + powerup.size / 2);
+            const dy = mainBall.y - (powerup.y + powerup.size / 2);
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance < MAGNET_RANGE && distance > 0) { // Check range and avoid division by zero
+                const moveX = (dx / distance) * MAGNET_STRENGTH;
+                const moveY = (dy / distance) * MAGNET_STRENGTH;
+                powerup.x += moveX;
+                powerup.y += moveY;
+
+                // Optional: Clamp powerup position to canvas bounds if needed
+                // powerup.x = Math.max(0, Math.min(canvas.width - powerup.size, powerup.x));
+                // powerup.y = Math.max(0, Math.min(canvas.height - powerup.size, powerup.y));
+            }
+        });
+    }
+    // -----------------------------
+    
     // --- Update ALL Balls ---
     for (let i = balls.length - 1; i >= 0; i--) {
         let currentBall = balls[i];
@@ -530,7 +557,7 @@ function update() {
             updateUI(); // Update display immediately
 
             // --- Calculate bounce physics --- 
-            const gripFactor = 1 - (saveData.upgrades.paddleGrip * 0.10); 
+            const gripFactor = 1 - (saveData.upgrades.paddleGrip * 0.15); 
             let collidePoint = (currentBall.y - (player.y + player.height / 2)) / (player.height / 2);
             let angleRad = collidePoint * (Math.PI / 4); 
             let currentSpeed = Math.sqrt(currentBall.dx**2 + currentBall.dy**2);
@@ -539,7 +566,15 @@ function update() {
             // --- End bounce physics ---
 
             currentBall.lastHitBy = 'player';
-            currentBall.isRed = Math.random() < redBallChance; // Determine if it TURNS red
+            // currentBall.isRed = Math.random() < redBallChance; // Determine if it TURNS red // OLD LOGIC
+            // --- Red Ball Logic REVISED ---
+            if (wasRed_before) {
+                currentBall.isRed = false; // Always turn white after red hit penalty
+            } else {
+                // Only roll the dice to turn red if it wasn't red before
+                currentBall.isRed = Math.random() < redBallChance;
+            }
+            // --- End Red Ball Logic ---
 
             if (currentBall.dx < 0) currentBall.dx *= -1; // Ensure it moves away
             currentBall.x = player.x + player.width + currentBall.size; // Prevent sticking
@@ -569,7 +604,15 @@ function update() {
             // --- End bounce physics ---
 
             currentBall.lastHitBy = 'ai';
-            currentBall.isRed = Math.random() < redBallChance; // Determine if it TURNS red
+            // currentBall.isRed = Math.random() < redBallChance; // Determine if it TURNS red // OLD LOGIC
+             // --- Red Ball Logic REVISED ---
+             if (wasRed_before) {
+                currentBall.isRed = false; // Always turn white after red hit penalty
+            } else {
+                // Only roll the dice to turn red if it wasn't red before
+                currentBall.isRed = Math.random() < redBallChance;
+            }
+            // --- End Red Ball Logic ---
 
             if (currentBall.dx > 0) currentBall.dx *= -1; // Ensure it moves away
             currentBall.x = ai.x - currentBall.size; // Prevent sticking
@@ -643,7 +686,7 @@ function gameLoop() {
     }
     if (aiHearts <= 0) {
         playSound(winSound); // Player Wins
-        const coinMultiplier = 1 + (saveData.upgrades.coinBonus * 0.05);
+        const coinMultiplier = 1 + (saveData.upgrades.coinBonus * 0.15);
         const coinsWon = Math.floor((playerScore + (playerHearts * 2)) * coinMultiplier);
         saveData.totalCoins += coinsWon;
         saveAllData();
@@ -653,7 +696,7 @@ function gameLoop() {
     }
     if (playerScore >= winningScore) {
         playSound(winSound); // Player Wins
-        const coinMultiplier = 1 + (saveData.upgrades.coinBonus * 0.05); 
+        const coinMultiplier = 1 + (saveData.upgrades.coinBonus * 0.15); 
         const coinsWon = Math.floor((playerScore + (playerHearts * 2)) * coinMultiplier);
         saveData.totalCoins += coinsWon; 
         saveAllData();
@@ -917,7 +960,7 @@ function createBall() {
     const newBall = {
         x: canvas.width / 2,
         y: canvas.height / 2,
-        size: ballSize,
+        size: ballSize, // Use updated ballSize constant
         dx: randomDx * speedFactor, // Apply boost factor here
         dy: randomDy * speedFactor, // And here
         isRed: false,
@@ -1005,7 +1048,7 @@ function initializeGame() {
     aiHearts = initialHearts;
 
     // Reset paddles to initial state, apply length upgrade
-    const lengthMultiplier = 1 + (saveData.upgrades.paddleLength * 0.08); // CHANGED scale to 0.08
+    const lengthMultiplier = 1 + (saveData.upgrades.paddleLength * 0.15); // CHANGED scale to 0.15
     player.height = initialPaddleHeight * lengthMultiplier;
     player.y = canvas.height / 2 - player.height / 2; // Recenter
     player.dy = 0;
@@ -1369,25 +1412,55 @@ function resetBall(scoredSide, centerReset = false) { // Added centerReset param
     // Determine if the new ball is red
     ball.isRed = Math.random() < redBallChance;
 
+    // Recalculate speed based on baseBallSpeed, respecting boost state ONLY if boost is active during reset
+    const speedFactor = isSpeedBoostActive ? 2 : 1; 
+    const baseSpeed = baseBallSpeed * speedFactor; // Apply boost *if active*
+    let newDx, newDy;
+
     if (centerReset) {
         // --- Center Reset Logic (after red ball miss) ---
         ball.x = canvas.width / 2;
         ball.y = canvas.height / 2;
-        ball.dx = (Math.random() > 0.5 ? 1 : -1) * baseBallSpeed; // Random horizontal direction
-        ball.dy = (Math.random() - 0.5) * baseBallSpeed * 0.5; // Small random vertical angle
+        // --- Recalculate direction keeping base speed ---
+        newDx = (Math.random() > 0.5 ? 1 : -1); // Random direction
+        newDy = (Math.random() - 0.5) * 0.5; // Small vertical angle component
+        const magnitude = Math.sqrt(newDx**2 + newDy**2);
+        ball.dx = (newDx / magnitude) * baseSpeed;
+        ball.dy = (newDy / magnitude) * baseSpeed;
+        // ---------------------------------------------
         console.log("Red ball missed, resetting to center.");
     } else {
-        // --- Standard Reset Logic (after score) ---
+        // --- Standard Reset Logic (after score) ---\
         ball.x = canvas.width / 2;
         ball.y = canvas.height / 2;
-        // Direction towards the player who just lost the point
-        ball.dx = (scoredSide === 'ai' ? -1 : 1) * baseBallSpeed;
-        ball.dy = (Math.random() - 0.5) * baseBallSpeed * 0.5; // Small random vertical angle
+        // --- Recalculate direction keeping base speed ---
+        newDx = (scoredSide === 'ai' ? -1 : 1); // Direction towards loser
+        newDy = (Math.random() - 0.5) * 0.5; // Small random vertical angle
+        const magnitude = Math.sqrt(newDx**2 + newDy**2);
+        ball.dx = (newDx / magnitude) * baseSpeed;
+        ball.dy = (newDy / magnitude) * baseSpeed;
+        // ---------------------------------------------
     }
 
-    // Reset speed boost effect if active on this ball
-    ball.speedMultiplier = 1; 
+    // // Reset speed boost effect if active on this ball // OLD LOGIC
+    // ball.speedMultiplier = 1; // This seems unused, dx/dy hold speed now
 
+}
+
+// Increase ball speed after paddle hit (seems unused by main loop, kept for potential future use)
+function increaseBallSpeed(ball) {
+    // Increase speed slightly on each hit, respecting a maximum speed maybe?
+    // Current simple approach: multiply by a factor
+    const speedMultiplier = 1.02; // Can adjust this
+     ball.dx *= speedMultiplier;
+     ball.dy *= speedMultiplier;
+     // Add a maximum speed check if desired
+     // const maxSpeed = baseBallSpeed * 3; // Example max
+     // const currentSpeed = Math.sqrt(ball.dx**2 + ball.dy**2);
+     // if (currentSpeed > maxSpeed) {
+     //     ball.dx = (ball.dx / currentSpeed) * maxSpeed;
+     //     ball.dy = (ball.dy / currentSpeed) * maxSpeed;
+     // }
 }
 
 // --- Ball Update Logic ---
@@ -1398,7 +1471,7 @@ function updateBalls() {
         ball.y += ball.dy * ball.speedMultiplier;
 
         // Collision with top/bottom walls
-        if (ball.y < 0 || ball.y > canvas.height - ballSize) {
+        if (ball.y < 0 || ball.y > canvas.height - ball.size) {
             ball.dy *= -1;
             playSound(wallHitSound);
         }
@@ -1407,7 +1480,7 @@ function updateBalls() {
         let hitPaddle = null; // Track which paddle was hit
 
         // Check player paddle collision
-        if (ball.dx < 0 && ball.x < player.x + player.width + ballSize && ball.x > player.x) { // More robust check
+        if (ball.dx < 0 && ball.x < player.x + player.width + ball.size && ball.x > player.x) { // Use ball.size
             if (collidesWithPaddle(ball, player)) {
                 hitPaddle = 'player';
                 if (ball.isRed) {
@@ -1441,7 +1514,7 @@ function updateBalls() {
         }
 
         // Check AI paddle collision
-        if (!hitPaddle && ball.dx > 0 && ball.x > ai.x - ballSize && ball.x < ai.x + ai.width) { // More robust check
+        if (!hitPaddle && ball.dx > 0 && ball.x > ai.x - ball.size && ball.x < ai.x + ai.width) { // Use ball.size
              if (collidesWithPaddle(ball, ai)) {
                 hitPaddle = 'ai';
                 if (ball.isRed) {
@@ -1470,7 +1543,7 @@ function updateBalls() {
 
 
         // Ball out of bounds (Scoring or Red Ball Miss)
-        if (ball.x < 0) {
+        if (ball.x < 0 - ball.size) { // Adjust boundary check for bigger ball
             if (ball.isRed) {
                 // --- Red Ball Missed by Player ---
                 console.log("Player missed RED ball.");
@@ -1489,7 +1562,7 @@ function updateBalls() {
                 }
             }
             updateUI();
-        } else if (ball.x > canvas.width) {
+        } else if (ball.x > canvas.width + ball.size) { // Adjust boundary check for bigger ball
              if (ball.isRed) {
                 // --- Red Ball Missed by AI ---
                  console.log("AI missed RED ball.");
@@ -1518,7 +1591,105 @@ function updateBalls() {
     });
 }
 
-// --- Power-up Collision & Effects ---
-// ... existing powerup code ...
+// Helper function for paddle collision (ensure it uses ball.size)
+function collidesWithPaddle(ball, paddle) {
+    const ballLeft = ball.x - ball.size;
+    const ballRight = ball.x + ball.size;
+    const ballTop = ball.y - ball.size;
+    const ballBottom = ball.y + ball.size;
+
+    const paddleLeft = paddle.x;
+    const paddleRight = paddle.x + paddle.width;
+    const paddleTop = paddle.y;
+    const paddleBottom = paddle.y + paddle.height;
+
+    return ballRight > paddleLeft && ballLeft < paddleRight && ballBottom > paddleTop && ballTop < paddleBottom;
+}
+
+// Move Event Listeners and initial calls to the end
+
+// Mouse movement to control player paddle
+canvas.addEventListener('mousemove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mouseY = e.clientY - rect.top;
+    
+    player.y = mouseY - player.height / 2;
+    
+    // Keep paddle within canvas
+    if (player.y < 0) {
+        player.y = 0;
+    } else if (player.y + player.height > canvas.height) {
+        player.y = canvas.height - player.height;
+    }
+});
+
+// Keyboard controls for player paddle
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowUp' || e.key === 'w') {
+        player.dy = -player.speed;
+    } else if (e.key === 'ArrowDown' || e.key === 's') {
+        player.dy = player.speed;
+    }
+});
+
+// Stop paddle movement on keyup
+document.addEventListener('keyup', (e) => {
+    if ((e.key === 'ArrowUp' || e.key === 'w') && player.dy < 0 ||
+        (e.key === 'ArrowDown' || e.key === 's') && player.dy > 0) {
+        player.dy = 0;
+    }
+});
+
+// --- Mouse Pause Logic --- ADDED ---
+canvas.addEventListener('mouseleave', () => {
+    if (gameRunning) { // Only pause if game is actually running
+        isPausedByMouse = true;
+        cancelAnimationFrame(currentGameLoopId); // Stop game loop
+        stopPowerupSpawner(); // Stop powerups spawning when paused
+        stopBGM(); // Stop BGM using Web Audio API
+        draw(); // Draw the pause overlay immediately
+    }
+});
+
+canvas.addEventListener('mouseenter', () => {
+    if (isPausedByMouse) { // Only resume if paused *by mouse*
+        isPausedByMouse = false;
+        if (gameRunning) { // Double-check game should be running
+            initAudioContext(); // Ensure context is active
+            playBGM(); // Resume BGM using Web Audio API
+            startPowerupSpawner(); // Resume powerups
+            gameLoop(); // Resume game loop
+        }
+    }
+});
+// ------------------------------------
+
+// --- Game Mechanics Toggle --- ADDED ---
+document.addEventListener('DOMContentLoaded', () => { // Ensure elements exist before adding listener
+    const toggle = document.getElementById('instruction-toggle');
+    const content = document.getElementById('instruction-content');
+
+    if (toggle && content) {
+        toggle.addEventListener('click', () => {
+            const isHidden = content.style.display === 'none';
+            content.style.display = isHidden ? 'block' : 'none';
+            toggle.textContent = isHidden ? 'Game Mechanics ▲' : 'Game Mechanics ▼';
+        });
+    } else {
+        console.error("Instruction toggle or content element not found!");
+    }
+});
+// -----------------------------
+
+// Delete Save Data Link Listener (Bottom) - ADDED
+if (deleteSaveLinkBottom) { 
+    deleteSaveLinkBottom.addEventListener('click', () => { // Wrap deleteSaveData to add sound
+         playSound(buttonClickSound);
+         deleteSaveData(); // Need to ensure deleteSaveData itself doesn't have listener
+    }); 
+} else {
+    console.error("Bottom delete save link (#delete-save-link) not found!");
+}
+// -----------------------------------------
 
 // ... rest of the file remains unchanged ... 
