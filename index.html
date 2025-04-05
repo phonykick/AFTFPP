@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AWESOME FUCKING TWISTED FUCKING PING PONG</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container" id="game-container">
+        <h1>AWESOME FUCKING TWISTED FUCKING PING PONG</h1>
+        <div id="canvas-container">
+            <canvas id="pongCanvas" width="800" height="600"></canvas>
+            
+            <!-- Initial Start Screen -->
+            <div id="start-screen-overlay">
+                <div id="start-screen-content">
+                    
+                    <button id="play-button">Play Game</button>
+                </div>
+            </div>
+
+            <!-- Upgrade Shop Screen (Initially Hidden) -->
+            <div id="shop-screen-overlay" style="display: none;">
+                <div id="shop-content">
+                    <h2>UPGRADE SHOP</h2>
+                    <div id="shop-coins">Coins: <span id="shop-coin-count">0</span></div>
+                    
+                    <div class="upgrade-grid">
+                        <!-- Upgrade Items -->
+                        <div class="upgrade-item">
+                            <h3>Paddle Length</h3>
+                            <p>Effect: +<span id="pl-effect">0</span>% Height</p>
+                            <p>Level: <span id="pl-level">0</span></p>
+                            <p>Cost: <span id="pl-cost">0</span></p>
+                            <button class="buy-btn" data-upgrade="paddleLength">Buy</button>
+                        </div>
+                        
+                        <div class="upgrade-item">
+                            <h3>Paddle Grip</h3>
+                            <p>Effect: <span id="pg-effect">0</span>% Less Angle Change</p>
+                            <p>Level: <span id="pg-level">0</span></p>
+                            <p>Cost: <span id="pg-cost">0</span></p>
+                            <button class="buy-btn" data-upgrade="paddleGrip">Buy</button>
+                        </div>
+
+                        <div class="upgrade-item">
+                            <h3>Coin Bonus</h3>
+                            <p>Effect: +<span id="cb-effect">0</span>% Coins Won</p>
+                            <p>Level: <span id="cb-level">0</span></p>
+                            <p>Cost: <span id="cb-cost">0</span></p>
+                            <button class="buy-btn" data-upgrade="coinBonus">Buy</button>
+                        </div>
+
+                        <div class="upgrade-item">
+                            <h3>Starting Score</h3>
+                            <p>Effect: Start with <span id="ss-effect">0</span> Points</p>
+                            <p>Level: <span id="ss-level">0</span></p>
+                            <p>Cost: <span id="ss-cost">0</span></p>
+                            <button class="buy-btn" data-upgrade="startingScore">Buy</button>
+                        </div>
+
+                        <div class="upgrade-item">
+                            <h3>Extra Heart</h3>
+                            <p>Effect: Start with <span id="eh-effect">0</span> Extra Hearts</p>
+                            <p>Level: <span id="eh-level">0</span></p>
+                            <p>Cost: <span id="eh-cost">0</span></p>
+                            <button class="buy-btn" data-upgrade="extraHeart">Buy</button>
+                        </div>
+                    </div> 
+
+                    <button id="play-again-btn">Play Again</button>
+                </div>
+            </div>
+        </div>
+        <div class="score-container">
+            <div class="player-stats">
+                <span>Score: <span id="player-score">0</span></span>
+                <span><span class="heart-label">Hearts:</span> <span id="player-hearts">3</span></span>
+                <span><span class="coins-display">Coins:</span> <span id="total-coins">0</span></span>
+            </div>
+            <div class="ai-stats">
+                <span><span class="heart-label">Hearts:</span> <span id="ai-hearts">3</span></span>
+                <span>Score: <span id="ai-score">0</span></span>
+            </div>
+        </div>
+        <div class="instructions">
+            <p>Use mouse or arrow keys (up/down or w/s) to move!</p>
+            <p>Lose all 3 hearts and you lose the game!</p>
+            <p>Reach 30 points or reduce opponent to 0 hearts to win the game!</p>
+
+            <!-- NEW: Collapsible section -->
+            <div class="collapsible-instructions">
+                 <h4 id="instruction-toggle" style="cursor: pointer; margin-top: 15px; margin-bottom: 5px; text-decoration: underline;">Game Mechanics ▼</h4>
+                 <div id="instruction-content" style="display: none;">
+                    <p>Hit the white ball past opponent. Avoid hitting the <span style="color: red; font-weight: bold;">RED</span> ball!</p>
+                    <p>Intentionally miss the <span style="color: red; font-weight: bold;">RED</span> ball. Hitting it costs a heart!</p>
+                    <p style="margin-top: 15px; font-weight: bold; text-decoration: underline;">Power-ups:</p>
+                    <p><span style="color: lightgreen; font-weight: bold;">Green Square:</span> Increases your paddle size temporarily.</p>
+                    <p><span style="color: orange; font-weight: bold;">Orange Square:</span> Shrinks opponent paddle temporarily.</p>
+                    <p><span style="color: cyan; font-weight: bold;">Cyan Square:</span> Adds another ball for a short time.</p>
+                    <p><span style="color: yellow; font-weight: bold;">Yellow Square:</span> Ball(s) move faster temporarily.</p>
+                    <p><span style="color: pink; font-weight: bold;">Pink Square:</span> Gain 1 extra heart (up to max).</p>
+                    <p><span style="color: purple; font-weight: bold;">Purple Square:</span> Doubles points earned temporarily.</p>
+                 </div>
+            </div>
+            <!-- END: Collapsible section -->
+            
+            <button id="restart-btn">Restart Game</button>
+            <span id="delete-save-link" class="delete-save-text">Delete Save Data</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
