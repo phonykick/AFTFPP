@@ -23,8 +23,7 @@ if (isMobileDevice()) {
     document.body.appendChild(messageDiv);
 
     // Prevent the rest of the game script from running
-    // Throwing an error is a simple way to stop execution
-    throw new Error("Mobile device detected. Game stopped.");
+    // throw new Error("Mobile device detected. Game stopped.");
 }
 // ---------------------
 
@@ -1375,25 +1374,32 @@ function startGame() {
     playBGM(); // Ensure BGM plays if starting from scratch (if loaded)
 }
 
-// --- Game Mechanics Toggle --- ADDED
-document.addEventListener('DOMContentLoaded', () => { // Ensure elements exist before adding listener
+// --- Setup Instructions Toggle ---
+function setupInstructionToggle() {
     const toggle = document.getElementById('instruction-toggle');
     const content = document.getElementById('instruction-content');
-
-    if (toggle && content) {
-        toggle.addEventListener('click', () => {
-            const isHidden = content.style.display === 'none';
-            content.style.display = isHidden ? 'block' : 'none';
-            toggle.textContent = isHidden ? 'Game Mechanics ▲' : 'Game Mechanics ▼';
-        });
-    } else {
-        console.error("Instruction toggle or content element not found!");
+    
+    if (!toggle || !content) {
+        console.error('Toggle elements not found:', { toggle, content });
+        return;
     }
-});
-// -----------------------------
+
+    // Force initial state
+    content.style.display = 'none';
+    let isVisible = false;
+
+    toggle.addEventListener('click', function() {
+        console.log('Toggle clicked'); // Debug log
+        isVisible = !isVisible; // Toggle the state
+        content.style.display = isVisible ? 'block' : 'none';
+        toggle.textContent = isVisible ? 'Game Mechanics ▲' : 'Game Mechanics ▼';
+        console.log('Display state changed to:', content.style.display); // Debug log
+    });
+}
 
 // Initialize the game when the script loads
-initializeGame(); 
+initializeGame();
+setupInstructionToggle(); // Setup the toggle after game init
 
 // Reset ball state (handles scoring or neutral reset)
 function resetBall(scoredSide, centerReset = false) { // Added centerReset parameter
