@@ -96,11 +96,11 @@ const winningScore = 30; // Score needed to win (changed back to 30)
 const MAX_UPGRADE_LEVEL = 5;
 
 const UPGRADE_COSTS = {
-    paddleLength:  { base: 10,  multiplier: 1.5 }, // Lowered base, slightly lower mult
-    paddleGrip:    { base: 15,  multiplier: 1.6 }, // Lowered base, slightly lower mult
-    coinBonus:     { base: 25, multiplier: 1.8 }, // Lowered base, lower mult
-    startingScore: { base: 10,  multiplier: 1.5 }, // Lowered base, slightly lower mult
-    extraHeart:    { base: 50, multiplier: 2.0 }  // Lowered base, lower mult
+    paddleLength:  { base: 5,  multiplier: 1.5 }, // Halved base cost
+    paddleGrip:    { base: 8,  multiplier: 1.6 }, // Reduced base cost
+    coinBonus:     { base: 12, multiplier: 1.8 }, // Reduced base cost
+    startingScore: { base: 5,  multiplier: 1.5 }, // Halved base cost
+    extraHeart:    { base: 25, multiplier: 2.0 }  // Halved base cost
 };
 
 const UPGRADE_EFFECTS = {
@@ -113,10 +113,10 @@ const UPGRADE_EFFECTS = {
 // -------------------------------
 
 // Power-up Constants
-const powerupSize = 15;
+const powerupSize = 25; // Increased size
 const maxPowerups = 2;
-const powerupSpawnInterval = 5000; // 5 seconds
-const powerupSpawnChance = 0.25; // 1 in 4 chance per interval
+const powerupSpawnInterval = 3000; // 3 seconds (Increased spawn rate)
+const powerupSpawnChance = 0.40; // 40% chance per interval (Increased spawn rate)
 const powerupTypes = [
     { type: 'increaseSelfPaddle', color: 'lightgreen' },
     { type: 'decreaseOpponentPaddle', color: 'orange' },
