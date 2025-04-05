@@ -201,11 +201,18 @@ if (restartButton) {
         initializeGame();
     });
 }
-if (deleteSaveLinkBottom) { 
-    deleteSaveLinkBottom.addEventListener('click', () => { // Wrap deleteSaveData to add sound
-         playSound(buttonClickSound);
-         deleteSaveData(); // Need to ensure deleteSaveData itself doesn't have listener
-    }); 
+if (deleteSaveLinkBottom) {
+    // Remove any existing listeners first
+    deleteSaveLinkBottom.replaceWith(deleteSaveLinkBottom.cloneNode(true));
+    // Get the fresh reference after replacing
+    const freshDeleteLink = document.getElementById('delete-save-link');
+    
+    if (freshDeleteLink) {
+        freshDeleteLink.addEventListener('click', () => {
+            playSound(buttonClickSound);
+            deleteSaveData();
+        });
+    }
 } else {
     console.error("Bottom delete save link (#delete-save-link) not found!");
 }
