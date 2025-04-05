@@ -45,9 +45,129 @@ const powerupSound = new Audio('audio/powerup.wav');
 const gameOverSound = new Audio('audio/game_over.wav'); // For AI Win
 const winSound = new Audio('audio/win.wav'); // ADDED For Player Win
 const buttonClickSound = new Audio('audio/button_click.wav'); // ADDED Generic click
+// const backgroundMusic = new Audio('audio/bgm.wav'); // REMOVED Old BGM element
+
+// --- Web Audio API Setup for BGM --- ADDED
+let audioContext;
+let bgmBuffer = null;
+let bgmSourceNode = null;
+let bgmGainNode;
+let isBgmPlaying = false;
+let isBgmLoaded = false;
+
+function initAudioContext() {
+    try {
+        if (!audioContext) {
+            console.log("Attempting to create AudioContext...");
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            console.log(`AudioContext created. Initial state: ${audioContext.state}`);
+            bgmGainNode = audioContext.createGain();
+            bgmGainNode.gain.value = 0.125; // Quieter volume
+            bgmGainNode.connect(audioContext.destination);
+            console.log("GainNode created and connected.");
+        }
+         // Resume context on user interaction if needed
+        if (audioContext.state === 'suspended') {
+            console.log("AudioContext is suspended. Attempting to resume...");
+            audioContext.resume().then(() => {
+                console.log(`AudioContext resumed. Current state: ${audioContext.state}`);
+            }).catch(err => {
+                 console.error("Failed to resume AudioContext:", err);
+            });
+        } else {
+            console.log(`AudioContext state is already: ${audioContext.state}`);
+        }
+    } catch (e) {
+        console.error("Error initializing AudioContext:", e);
+    }
+}
+
+async function loadBGM() {
+    if (!audioContext) {
+        console.log("loadBGM: AudioContext not ready, aborting load.");
+        return;
+    }
+    if (isBgmLoaded) {
+         console.log("loadBGM: BGM already loaded.");
+         return;
+    }
+    console.log("loadBGM: Attempting to fetch and decode bgm.wav...");
+    try {
+        const response = await fetch('audio/bgm.wav');
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        console.log("loadBGM: Audio file fetched successfully.");
+        bgmBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        isBgmLoaded = true;
+        console.log("BGM loaded and decoded successfully.");
+    } catch (error) {
+        console.error("Failed to load or decode BGM:", error);
+        isBgmLoaded = false;
+    }
+}
+
+function playBGM() {
+    console.log(`playBGM called. isLoaded: ${isBgmLoaded}, isPlaying: ${isBgmPlaying}, contextState: ${audioContext ? audioContext.state : 'null'}`);
+    if (!isBgmLoaded || !audioContext || audioContext.state !== 'running') {
+         console.log("playBGM: Conditions not met (not loaded, context not ready/running). Aborting play.");
+         if (audioContext && audioContext.state === 'suspended') {
+             console.log("playBGM: Attempting to resume suspended context...");
+             initAudioContext(); // Try resuming
+         }
+         return; 
+    }
+    if (isBgmPlaying) {
+        console.log("playBGM: Already playing. Aborting.");
+        return;
+    }
+    
+    // Stop existing source if somehow still lingering
+    if (bgmSourceNode) {
+        try { 
+            console.log("playBGM: Stopping lingering source node.");
+            bgmSourceNode.stop(); 
+        } catch (e) {}
+    }
+
+    console.log("playBGM: Creating and starting new source node.");
+    bgmSourceNode = audioContext.createBufferSource();
+    bgmSourceNode.buffer = bgmBuffer;
+    bgmSourceNode.loop = true;
+    bgmSourceNode.connect(bgmGainNode);
+    try {
+        bgmSourceNode.start(0);
+        isBgmPlaying = true;
+        console.log("BGM started successfully.");
+    } catch (e) {
+        console.error("Error starting BGM source node:", e);
+        isBgmPlaying = false;
+    }
+}
+
+function stopBGM() {
+    console.log(`stopBGM called. isPlaying: ${isBgmPlaying}, sourceNode exists: ${!!bgmSourceNode}`);
+    if (bgmSourceNode && isBgmPlaying) {
+        try {
+            bgmSourceNode.stop(0); // Stop immediately
+            console.log("BGM source node stopped.");
+        } catch (e) {
+            console.warn("Warning stopping BGM source node (might be already stopped):", e);
+        }
+        bgmSourceNode.disconnect(); // Disconnect node
+        bgmSourceNode = null; // Discard the node
+        isBgmPlaying = false;
+    } else if (!isBgmPlaying) {
+        console.log("stopBGM: Not currently playing.");
+    }
+}
+// --- End Web Audio API ---
 
 // Adjust volume for specific sounds if needed
 redBallPenaltySound.volume = 0.60; // Reduced volume further to 60%
+// backgroundMusic.volume = 0.25; // REMOVED
+// backgroundMusic.loop = true; // REMOVED
 
 function playSound(soundObject) {
     // Reset playback to allow rapid replays (like paddle hits)
@@ -59,9 +179,21 @@ function playSound(soundObject) {
 }
 // -------------
 
+// --- Function to handle BGM playback --- ADDED // REMOVED Old function
+// function controlBackgroundMusic(action) { ... }
+// -------------------------------------- // REMOVED
+
 // --- Add Event Listeners ---
 playButton.addEventListener('click', () => { // Wrap startGame to add sound
     playSound(buttonClickSound);
+    initAudioContext(); // Initialize/resume on first click
+    if (!isBgmLoaded) {
+        loadBGM().then(() => { // Load BGM if not already loaded
+           playBGM(); // Play after loading
+        });
+    } else {
+        playBGM(); // Play directly if already loaded
+    }
     startGame();
 });
 if (restartButton) {
@@ -290,14 +422,13 @@ function collision(ball, paddle) {
            ball.y + ball.size > paddle.y;
 }
 
-// Move AI paddle
+// AI movement logic
 function moveAI() {
     if (balls.length === 0) return; // No ball to track
     const primaryBall = balls[0];
     const paddleCenter = ai.y + ai.height / 2;
     const targetY = primaryBall.y; // Target based on ball's current Y
-    const dodgeChance = 0.6; // 60% chance to dodge red balls
-
+    const dodgeChance = 0.5;
     // --- AI Logic --- 
     if (primaryBall.dx > 0) { // Only react if ball is moving towards AI
 
@@ -825,30 +956,24 @@ function revertBallSpeed(ball) {
 
 // --- Mouse Pause/Resume Listeners ---
 canvas.addEventListener('mouseleave', () => {
-    // Pause only if the game is currently running and not already paused by mouse
-    if (gameRunning && !isPausedByMouse) {
+    if (gameRunning) { // Only pause if game is actually running
         isPausedByMouse = true;
-        gameRunning = false; // Stop updates
-        if (currentGameLoopId) {
-            cancelAnimationFrame(currentGameLoopId); // Stop requesting new frames
-            currentGameLoopId = null;
-        }
-        stopPowerupSpawner(); // Stop powerups spawning while paused
-        console.log("Game paused (mouse left)");
+        cancelAnimationFrame(currentGameLoopId); // Stop game loop
+        stopPowerupSpawner(); // Stop powerups spawning when paused
+        stopBGM(); // Stop BGM using Web Audio API
+        draw(); // Draw the pause overlay immediately
     }
 });
 
 canvas.addEventListener('mouseenter', () => {
-    // Resume only if it was specifically paused by the mouse
-    if (isPausedByMouse) {
+    if (isPausedByMouse) { // Only resume if paused *by mouse*
         isPausedByMouse = false;
-        gameRunning = true; // Allow updates again
-        startPowerupSpawner(); // Resume powerups
-        // Ensure loop restarts if it was fully cancelled
-        if (!currentGameLoopId) {
-            currentGameLoopId = requestAnimationFrame(gameLoop);
+        if (gameRunning) { // Double-check game should be running
+            initAudioContext(); // Ensure context is active
+            playBGM(); // Resume BGM using Web Audio API
+            startPowerupSpawner(); // Resume powerups
+            gameLoop(); // Resume game loop
         }
-        console.log("Game resumed (mouse entered)");
     }
 });
 // ------------------------------------
@@ -925,6 +1050,8 @@ function initializeGame() {
     // Draw initial state (e.g., paddles in place, score 0)
     // This might be needed if the canvas isn't completely hidden by the overlay
     draw();
+
+    stopBGM(); // Stop BGM on restart/init
 }
 
 // Function called when game ends
@@ -979,6 +1106,8 @@ function win(message) {
     document.addEventListener('click', shopTransitionHandler);
     document.addEventListener('keydown', shopTransitionHandler);
     // -----------------------------
+
+    stopBGM(); // Stop BGM on game over
 }
 
 // --- Save/Load Functions (Refactored) ---
@@ -1198,6 +1327,9 @@ function startGame() {
     } else {
         console.log("Game loop already requested? ID:", currentGameLoopId);
     }
+
+    initAudioContext(); // Ensure context is active
+    playBGM(); // Ensure BGM plays if starting from scratch (if loaded)
 }
 
 // --- Game Mechanics Toggle --- ADDED
@@ -1219,3 +1351,174 @@ document.addEventListener('DOMContentLoaded', () => { // Ensure elements exist b
 
 // Initialize the game when the script loads
 initializeGame(); 
+
+// Reset ball state (handles scoring or neutral reset)
+function resetBall(scoredSide, centerReset = false) { // Added centerReset parameter
+    // If only one ball exists after scoring, create a new one
+    // Find the index of the ball that scored (often the only one left)
+    // This logic might need review if multi-ball causes issues here
+    let ball = balls[0]; // Assume the first ball is the one to reset if called after score
+    if (!ball) { // If no balls exist (e.g., multi-ball cleared), create one
+        ball = createBall();
+        balls.push(ball);
+    } else {
+        // If multiple balls exist, maybe target the one that went out? Difficult to track.
+        // Safest is usually to reset the first ball in the array after a score.
+    }
+
+    // Determine if the new ball is red
+    ball.isRed = Math.random() < redBallChance;
+
+    if (centerReset) {
+        // --- Center Reset Logic (after red ball miss) ---
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.dx = (Math.random() > 0.5 ? 1 : -1) * baseBallSpeed; // Random horizontal direction
+        ball.dy = (Math.random() - 0.5) * baseBallSpeed * 0.5; // Small random vertical angle
+        console.log("Red ball missed, resetting to center.");
+    } else {
+        // --- Standard Reset Logic (after score) ---
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        // Direction towards the player who just lost the point
+        ball.dx = (scoredSide === 'ai' ? -1 : 1) * baseBallSpeed;
+        ball.dy = (Math.random() - 0.5) * baseBallSpeed * 0.5; // Small random vertical angle
+    }
+
+    // Reset speed boost effect if active on this ball
+    ball.speedMultiplier = 1; 
+
+}
+
+// --- Ball Update Logic ---
+function updateBalls() {
+    balls.forEach((ball, index) => {
+        // Move ball
+        ball.x += ball.dx * ball.speedMultiplier;
+        ball.y += ball.dy * ball.speedMultiplier;
+
+        // Collision with top/bottom walls
+        if (ball.y < 0 || ball.y > canvas.height - ballSize) {
+            ball.dy *= -1;
+            playSound(wallHitSound);
+        }
+
+        // Collision with paddles
+        let hitPaddle = null; // Track which paddle was hit
+
+        // Check player paddle collision
+        if (ball.dx < 0 && ball.x < player.x + player.width + ballSize && ball.x > player.x) { // More robust check
+            if (collidesWithPaddle(ball, player)) {
+                hitPaddle = 'player';
+                if (ball.isRed) {
+                    // --- Red Ball Hit Penalty (Player) ---
+                    playerScore = Math.max(0, playerScore - 1);
+                    playSound(redBallPenaltySound);
+                    ball.isRed = false; // Turn ball white
+                    console.log("Player hit red ball! Score -1");
+                    updateUI(); // Update score immediately
+                } else {
+                    // --- Normal Hit Sound ---
+                    playSound(paddleHitSound);
+                }
+
+                // Bounce logic (applies to both red and white after penalty check)
+                let collidePoint = ball.y - (player.y + player.height / 2);
+                collidePoint = collidePoint / (player.height / 2);
+                let angleRad = collidePoint * (Math.PI / 4); // Max 45 degrees
+
+                // Apply grip modifier
+                const gripLevel = saveData.upgrades.paddleGrip;
+                const gripEffect = UPGRADE_EFFECTS.paddleGrip.scale;
+                const gripModifier = 1.0 - (gripLevel * gripEffect);
+                angleRad *= gripModifier;
+
+                let speed = Math.sqrt(ball.dx**2 + ball.dy**2);
+                ball.dx = speed * Math.cos(angleRad); // Positive direction after player hit
+                ball.dy = speed * Math.sin(angleRad);
+                increaseBallSpeed(ball); // Speed up slightly
+            }
+        }
+
+        // Check AI paddle collision
+        if (!hitPaddle && ball.dx > 0 && ball.x > ai.x - ballSize && ball.x < ai.x + ai.width) { // More robust check
+             if (collidesWithPaddle(ball, ai)) {
+                hitPaddle = 'ai';
+                if (ball.isRed) {
+                    // --- Red Ball Hit Penalty (AI) ---
+                    aiScore = Math.max(0, aiScore - 1);
+                    playSound(redBallPenaltySound);
+                    ball.isRed = false; // Turn ball white
+                    console.log("AI hit red ball! Score -1");
+                    updateUI(); // Update score immediately
+                } else {
+                     // --- Normal Hit Sound ---
+                    playSound(paddleHitSound);
+                }
+
+                // Bounce logic (AI doesn't have grip upgrade)
+                 let collidePoint = ball.y - (ai.y + ai.height / 2);
+                collidePoint = collidePoint / (ai.height / 2);
+                let angleRad = collidePoint * (Math.PI / 4);
+
+                let speed = Math.sqrt(ball.dx**2 + ball.dy**2);
+                ball.dx = -speed * Math.cos(angleRad); // Negative direction after AI hit
+                ball.dy = speed * Math.sin(angleRad);
+                increaseBallSpeed(ball);
+            }
+        }
+
+
+        // Ball out of bounds (Scoring or Red Ball Miss)
+        if (ball.x < 0) {
+            if (ball.isRed) {
+                // --- Red Ball Missed by Player ---
+                console.log("Player missed RED ball.");
+                resetBall(null, true); // Neutral center reset
+            } else {
+                // --- AI Scores ---
+                console.log("AI scored.");
+                aiScore += isAiScoreDoubled ? 2 : 1; // Apply double score if active
+                playerHearts--;
+                playSound(scoreSound);
+                if (playerHearts <= 0) {
+                    win(`YOU LOSE! ${playerScore} - ${aiScore}`);
+                    calculateCoinReward(false); // Player lost
+                } else {
+                    resetBall('player'); // Normal reset, ball goes to AI
+                }
+            }
+            updateUI();
+        } else if (ball.x > canvas.width) {
+             if (ball.isRed) {
+                // --- Red Ball Missed by AI ---
+                 console.log("AI missed RED ball.");
+                resetBall(null, true); // Neutral center reset
+            } else {
+                 // --- Player Scores ---
+                console.log("Player scored.");
+                playerScore += isPlayerScoreDoubled ? 2 : 1; // Apply double score if active
+                aiHearts--;
+                playSound(scoreSound);
+                if (aiHearts <= 0) {
+                    win(`YOU WIN! ${playerScore} - ${aiScore}`);
+                     calculateCoinReward(true); // Player won
+                } else {
+                    resetBall('ai'); // Normal reset, ball goes to player
+                }
+            }
+            updateUI();
+        }
+
+        // If a score happened and removed hearts, this ball instance might be invalid
+        // A better approach might involve marking balls for removal and handling it outside the loop
+        if (playerHearts <= 0 || aiHearts <= 0) {
+             return; // Exit early if game ended due to score
+        }
+    });
+}
+
+// --- Power-up Collision & Effects ---
+// ... existing powerup code ...
+
+// ... rest of the file remains unchanged ... 
